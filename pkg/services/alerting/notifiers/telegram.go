@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"os"
+	"strings"
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/models"
@@ -37,8 +39,14 @@ func init() {
 				InputType:    alerting.InputTypeText,
 				Placeholder:  "Telegram BOT API Token",
 				PropertyName: "bottoken",
-				Required:     true,
 				Secure:       true,
+			},
+			{
+				Label:        "BOT API Token file",
+				Element:      alerting.ElementTypeInput,
+				InputType:    alerting.InputTypeText,
+				Placeholder:  "Telegram BOT API Token file",
+				PropertyName: "bottoken_file",
 			},
 			{
 				Label:        "Chat ID",
@@ -72,8 +80,16 @@ func NewTelegramNotifier(model *models.AlertNotification, fn alerting.GetDecrypt
 	chatID := model.Settings.Get("chatid").MustString()
 	uploadImage := model.Settings.Get("uploadImage").MustBool()
 
+	botTokenFile := model.Settings.Get("bottoken").MustString()
+	if botToken == "" && botTokenFile == "" {
+		return nil, alerting.ValidationError{Reason: "Could not find Bot Token or Bot Token file in settings"}
+	}
 	if botToken == "" {
-		return nil, alerting.ValidationError{Reason: "Could not find Bot Token in settings"}
+		tokenFile, err := ioutil.ReadFile(botTokenFile)
+		if err != nil {
+			return nil, err
+		}
+		botToken = strings.TrimSpace(string(tokenFile))
 	}
 
 	if chatID == "" {
